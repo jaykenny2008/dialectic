@@ -236,8 +236,14 @@
     <h3>Presets</h3>
     <div class="row" id="presets"></div>
 
-    <h3>Buttons</h3>
-    <div class="grid" id="mapping"></div>
+    <div id="mapping-section">
+      <h3>Buttons</h3>
+      <div class="grid" id="mapping"></div>
+    </div>
+    <div id="gamepad-section">
+      <h3>Real gamepad mode</h3>
+      <p class="hint">Your phone shows up in the game as an Xbox-style controller with analog sticks. This needs the <b>Phone Gamepad</b> extension in Chrome on your Mac (see the README). If the game doesn't react, pick a key-based preset above instead.</p>
+    </div>
 
     <h3>Options</h3>
     <label class="toggle"><input type="checkbox" id="opt-4way"> 4-way D-pad and sticks (no diagonals)</label>
@@ -281,7 +287,8 @@ const BUTTONS = {
 };
 const ARROWS = { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' };
 const PRESETS = {
-  sticks: { label: 'Dual sticks (WASD + Arrows)', layout: 'sticks', map: {
+  gamepad: { label: 'Real gamepad (analog sticks)', layout: 'sticks', gamepad: true, map: {} },
+  sticks: { label: 'Keys: dual sticks (WASD + Arrows)', layout: 'sticks', map: {
     ls_up: 'w', ls_left: 'a', ls_down: 's', ls_right: 'd',
     rs_up: 'ArrowUp', rs_left: 'ArrowLeft', rs_down: 'ArrowDown', rs_right: 'ArrowRight',
     a: 'Space', b: 'e', x: 'q', y: 'r', lb: 'z', rb: 'x', lt: 'Shift', rt: 'c', start: 'Escape', select: 'Tab',
@@ -291,13 +298,13 @@ const PRESETS = {
   retro:  { label: 'D-pad: Retro (Z / X)', layout: 'classic', map: { ...ARROWS, a: 'x', b: 'z', x: 's', y: 'a', l: 'q', r: 'w', start: 'Enter', select: 'Shift' } },
 };
 
-const SETTINGS_KEY = 'controller-settings-v2';
+const SETTINGS_KEY = 'controller-settings-v3';
 function loadSettings() {
   try {
     const s = JSON.parse(localStorage.getItem(SETTINGS_KEY));
     if (s && s.map && BUTTONS[s.layout]) return s;
   } catch {}
-  return { preset: 'sticks', layout: 'sticks', map: { ...PRESETS.sticks.map }, fourWay: false, labels: true };
+  return { preset: 'gamepad', layout: 'sticks', gamepad: true, map: {}, fourWay: false, labels: true };
 }
 function saveSettings() {
   try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch {}
@@ -310,13 +317,13 @@ function renderLabels() {
   document.getElementById('select-name').textContent = BUTTONS[settings.layout].select;
   document.querySelectorAll('[data-btn]').forEach((el) => {
     const k = el.querySelector('.key');
-    if (k) k.textContent = pretty(settings.map[el.dataset.btn]);
+    if (k) k.textContent = settings.gamepad ? '' : pretty(settings.map[el.dataset.btn]);
   });
   document.querySelectorAll('[data-stick]').forEach((zone) => {
     const p = zone.dataset.stick;
     const keys = ['up', 'left', 'down', 'right'].map((d) => pretty(settings.map[`${p}_${d}`]));
     zone.querySelector('.stick-label').textContent =
-      `${p === 'ls' ? 'Left' : 'Right'} stick · ${keys.join(' ')}`;
+      `${p === 'ls' ? 'Left' : 'Right'} stick · ${settings.gamepad ? 'analog' : keys.join(' ')}`;
   });
 }
 
@@ -343,6 +350,7 @@ function connect() {
     retryMs = 500;
     setStatus('Connected', 'ok');
     pressedKeys = new Set();
+    lastPad = '';
     update(); // re-press anything still held through a reconnect
   };
   ws.onmessage = (e) => {
@@ -440,10 +448,62 @@ function update() {
   document.querySelectorAll('[data-dir]').forEach((el) => el.classList.toggle('on', active.has(el.dataset.dir)));
   document.querySelectorAll('[data-stick]').forEach((zone) => renderStick(zone, stickTouches.get(zone)));
 
+  if (settings.gamepad) {
+    sendPad(active, stickTouches);
+    return;
+  }
+
   const keys = new Set([...active].map((b) => settings.map[b]).filter(Boolean));
   for (const k of pressedKeys) if (!keys.has(k)) send({ t: 'u', k });
   for (const k of keys) if (!pressedKeys.has(k)) send({ t: 'd', k });
   pressedKeys = keys;
+}
+
+// ---------------------------------------------------------------------------
+// Real gamepad mode
+// ---------------------------------------------------------------------------
+//
+// Instead of key presses, send analog stick positions and button states. The
+// Mac server passes them to the Phone Gamepad Chrome extension, which makes
+// them appear as a standard (Xbox layout) gamepad to the game.
+
+// Button ids -> index in the W3C "standard" gamepad layout.
+const GAMEPAD_BUTTONS = {
+  a: 0, b: 1, x: 2, y: 3, lb: 4, l: 4, rb: 5, r: 5, lt: 6, rt: 7,
+  select: 8, start: 9, up: 12, down: 13, left: 14, right: 15,
+};
+let lastPad = '';
+let padFrame = 0;
+let padState = { a: [0, 0, 0, 0], b: 0 };
+
+function stickAxes(zone, t) {
+  if (!t) return [0, 0];
+  const max = stickRadius(zone) * 0.62; // full tilt where the knob stops
+  let x = (t.x - t.ox) / max, y = (t.y - t.oy) / max;
+  const len = Math.hypot(x, y);
+  const dead = 0.08;
+  if (len < dead) return [0, 0];
+  // Rescale so movement starts smoothly just outside the dead zone, capped at 1.
+  const scale = Math.min(1, (len - dead) / (1 - dead)) / len;
+  return [+(x * scale).toFixed(3), +(y * scale).toFixed(3)];
+}
+
+function sendPad(active, stickTouches) {
+  const ls = document.querySelector('[data-stick="ls"]');
+  const rs = document.querySelector('[data-stick="rs"]');
+  let b = 0;
+  for (const id of active) if (id in GAMEPAD_BUTTONS) b |= 1 << GAMEPAD_BUTTONS[id];
+  padState = { a: [...stickAxes(ls, stickTouches.get(ls)), ...stickAxes(rs, stickTouches.get(rs))], b };
+  // Touch events can fire faster than the screen refreshes; send once per frame.
+  if (!padFrame) padFrame = requestAnimationFrame(flushPad);
+}
+
+function flushPad() {
+  padFrame = 0;
+  const msg = JSON.stringify(padState);
+  if (msg === lastPad) return;
+  lastPad = msg;
+  send({ t: 'pad', ...padState });
 }
 
 function onTouch(e) {
@@ -518,13 +578,17 @@ function renderSettings() {
     b.textContent = p.label;
     b.onclick = () => {
       settings.preset = id;
+      releaseAll();
       settings.layout = p.layout;
+      settings.gamepad = !!p.gamepad;
       settings.map = { ...p.map };
       saveSettings(); renderLabels(); renderSettings();
     };
     presets.appendChild(b);
   }
 
+  document.getElementById('mapping-section').style.display = settings.gamepad ? 'none' : '';
+  document.getElementById('gamepad-section').style.display = settings.gamepad ? '' : 'none';
   const mapping = document.getElementById('mapping');
   mapping.innerHTML = '';
   for (const [btn, label] of Object.entries(BUTTONS[settings.layout])) {
@@ -536,6 +600,7 @@ function renderSettings() {
     sel.onchange = () => {
       settings.map[btn] = sel.value;
       settings.preset = 'custom';
+      settings.gamepad = false;
       saveSettings(); renderLabels(); renderSettings();
     };
     row.append(label, sel);

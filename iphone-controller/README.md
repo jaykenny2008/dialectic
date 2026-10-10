@@ -47,29 +47,42 @@ This opens a free tunnel through [localhost.run](https://localhost.run) using `s
 - You get a new link each time, so Home Screen shortcuts won't carry over between runs.
 - The link works from anywhere on the internet, but only with the secret code at the end. Don't share it, and press Ctrl+C when you're done playing.
 
-## Controls
+## Real gamepad mode (analog sticks) — the default
 
-The default layout is **dual joysticks**, laid out like an Xbox controller:
+The phone shows up in the game as an **Xbox-style controller with analog sticks**: half a push is half a push. Games that support controllers switch to their controller mode on their own. This needs a small Chrome extension on the Mac, installed once:
 
-| Control | Mac key |
+1. Open Chrome and go to `chrome://extensions`.
+2. Turn on **Developer mode** (top right).
+3. Click **Load unpacked** and choose the `iphone-controller/chrome-extension` folder.
+4. Reload your game's tab.
+
+Then start the server (`npm start` or `npm run online`), open the controller on your phone and play. Terminal prints "Game page connected" when the game is picking it up. If Chrome asks to let the site access devices on your local network, click **Allow**: that's the extension talking to the controller server on your own Mac.
+
+Works in Chrome and other Chrome-based browsers (Edge, Brave, Arc), not Safari. The extension only connects on pages that look for a gamepad, and it expects the server on its default port (8080).
+
+| Phone | Gamepad |
 |---|---|
-| Left stick | W A S D |
-| Right stick | Arrow keys (flick it for tricks: pull back, then flick) |
-| A / B / X / Y | Space / E / Q / R |
-| LB / RB | Z / X |
-| LT / RT | Shift / C |
-| Start / Back | Esc / Tab |
+| Left / right stick | Left / right analog stick |
+| A / B / X / Y | A / B / X / Y |
+| LB / RB, LT / RT | Bumpers, triggers |
+| Back / Start | Back (View) / Start (Menu) |
 
-Each stick re-centres wherever your thumb lands, so you don't have to hit the exact middle. Let go and the stick snaps back, releasing its keys.
+## Key-based modes
 
-Tap the ⚙️ on the phone to switch to a classic **D-pad** layout (Arrows + Space, WASD + Space, or Retro Z/X), remap any button or stick direction to any key, or turn off diagonals. Settings are saved on the phone.
+For games without controller support, tap ⚙️ on the phone and pick a **Keys** preset. Each button then presses a real key on the Mac (this needs the Accessibility permission from the setup steps):
 
-You can hold several buttons at once and slide between buttons (e.g. roll from A to B). If the phone locks or drops off the network, the Mac lets go of every key within a few seconds, so nothing stays stuck down.
+- **Keys: dual sticks**: left stick = W A S D, right stick = arrow keys, A/B/X/Y = Space/E/Q/R, LB/RB = Z/X, LT/RT = Shift/C, Start/Back = Esc/Tab.
+- **D-pad** presets: Arrows + Space, WASD + Space, or Retro Z/X.
+
+You can remap any button or stick direction to any key, or turn off diagonals. Settings are saved on the phone.
+
+Each stick re-centres wherever your thumb lands, so you don't have to hit the exact middle. You can hold several buttons at once and slide between buttons. If the phone locks or drops off the network, every key and stick is released within a few seconds, so nothing stays stuck.
 
 ## Troubleshooting
 
 - **Phone can't open the page:** make sure both devices are on the same Wi-Fi (not guest Wi-Fi), and allow incoming connections for `node` in **System Settings → Network → Firewall → Options**. Some public or office networks block devices from talking to each other. If that happens, turn on your iPhone's Personal Hotspot and connect the Mac to it.
-- **Phone connects but nothing happens in the game:** click inside the game on the Mac first. Check that Terminal is switched on under Accessibility, and that you restarted Terminal after enabling it.
+- **Gamepad mode: the game ignores the controller:** make sure the extension is on in `chrome://extensions`, reload the game tab and check that Terminal says "Game page connected". Some games only notice a controller after you press a button.
+- **Key mode: phone connects but nothing happens in the game:** click inside the game on the Mac first. Check that Terminal is switched on under Accessibility, and that you restarted Terminal after enabling it.
 - **"Old link: rescan the QR code":** the link is protected by a secret code saved in `.token`. Scan the QR code again. To lock out every old link, delete `.token` and restart.
 - **Try it without pressing real keys:** `npm run dry` prints the button presses in Terminal instead of sending them.
 - **Use a different port:** `PORT=9000 npm start`
@@ -78,4 +91,5 @@ You can hold several buttons at once and slide between buttons (e.g. roll from A
 
 - `server.js`: serves the page and turns phone input into key presses
 - `public/index.html`: the controller page your iPhone opens
+- `chrome-extension/`: makes the phone appear as a real gamepad to browser games
 - `keys.js`: tiny helper that sends the key events using automation tools built into macOS (nothing to install)

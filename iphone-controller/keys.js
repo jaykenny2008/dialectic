@@ -20,6 +20,8 @@ function run() {
   say(trusted ? 'READY' : 'NO_ACCESSIBILITY');
 
   const HID_EVENT_TAP = 0; // kCGHIDEventTap
+  // Shift, Control, Option, Command (left and right).
+  const MODIFIERS = [0x38, 0x3c, 0x3b, 0x3e, 0x3a, 0x3d, 0x37, 0x36];
   let buf = '';
   for (;;) {
     const data = stdin.availableData; // blocks until the server sends something
@@ -31,7 +33,11 @@ function run() {
       buf = buf.slice(nl + 1);
       const keyCode = parseInt(code, 10);
       if (isNaN(keyCode)) continue;
-      $.CGEventPost(HID_EVENT_TAP, $.CGEventCreateKeyboardEvent(null, keyCode, type === 'd'));
+      const event = $.CGEventCreateKeyboardEvent(null, keyCode, type === 'd');
+      // macOS tags synthetic arrow keys with the Fn flag; repeated "Fn" presses
+      // trigger the Dictation shortcut. Plain keys should carry no modifiers.
+      if (!MODIFIERS.includes(keyCode)) $.CGEventSetFlags(event, 0);
+      $.CGEventPost(HID_EVENT_TAP, event);
     }
   }
 }

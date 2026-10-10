@@ -105,15 +105,42 @@ const server = http.createServer((req, res) => {
 // ---------------------------------------------------------------------------
 //
 // Messages from the phone are JSON: {"t":"d","k":"Space"} (down),
-// {"t":"u","k":"Space"} (up), {"t":"reset"} (release everything).
+// {"t":"u","k":"Space"} (up), {"t":"reset"} (release everything), and in
+// real gamepad mode {"t":"pad","a":[lx,ly,rx,ry],"b":<button bitmask>}.
+//
+// The Phone Gamepad Chrome extension connects to /gamepad (no token: it can
+// only listen) and receives the latest pad state as {"c":1,"a":[...],"b":n},
+// or {"c":0} once no phone is driving the gamepad.
 
 const wss = new WebSocketServer({ server });
 // How many connected phones are currently holding each key, so two players
 // sharing a key don't release it out from under each other.
 const holders = new Map();
 
+const gamepadClients = new Set();
+let padOwner = null; // the phone whose state the gamepad currently shows
+let padState = { c: 0 };
+
+function broadcastPad(state) {
+  padState = state;
+  const msg = JSON.stringify(state);
+  for (const client of gamepadClients) client.send(msg);
+}
+
+function acceptGamepadClient(ws) {
+  gamepadClients.add(ws);
+  ws.isAlive = true;
+  ws.on('pong', () => { ws.isAlive = true; });
+  ws.send(JSON.stringify(padState));
+  if (gamepadClients.size === 1) console.log('🎮 Game page connected (Phone Gamepad extension)');
+  ws.on('close', () => gamepadClients.delete(ws));
+}
+
+const clamp = (v) => (Number.isFinite(v) ? Math.max(-1, Math.min(1, v)) : 0);
+
 wss.on('connection', (ws, req) => {
   const url = new URL(req.url, 'http://x');
+  if (url.pathname === '/gamepad') return acceptGamepadClient(ws);
   if (url.searchParams.get('k') !== TOKEN) {
     ws.close(4001, 'bad token');
     return;
@@ -146,13 +173,18 @@ wss.on('connection', (ws, req) => {
     try { msg = JSON.parse(data); } catch { return; }
     if (msg.t === 'd') press(msg.k);
     else if (msg.t === 'u') release(msg.k);
-    else if (msg.t === 'reset') releaseAll();
+    else if (msg.t === 'reset') { releaseAll(); if (padOwner === ws) broadcastPad({ c: 1, a: [0, 0, 0, 0], b: 0 }); }
+    else if (msg.t === 'pad' && Array.isArray(msg.a)) {
+      padOwner = ws;
+      broadcastPad({ c: 1, a: [0, 1, 2, 3].map((i) => clamp(msg.a[i])), b: msg.b >>> 0 });
+    }
     else if (msg.t === 'ping') ws.send(JSON.stringify({ t: 'pong', id: msg.id }));
   });
 
   // Never leave keys stuck down if the phone locks, sleeps or drops off Wi-Fi.
   ws.on('close', () => {
     releaseAll();
+    if (padOwner === ws) { padOwner = null; broadcastPad({ c: 0 }); }
     console.log(`📴 Controller disconnected (${who})`);
   });
 });
