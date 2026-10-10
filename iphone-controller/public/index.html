@@ -534,9 +534,10 @@ function flushPad() {
   send({ t: 'pad', ...padState });
 }
 
-// A thumb that is still moving fast when it lifts is a flick: send the stick
+// A thumb still moving fast *outward* when it lifts is a flick: send the stick
 // at full tilt in that direction. The extension holds it for a few frames
-// before re-centring, so the game sees the whole flick.
+// before re-centring, so the game sees the whole flick. Moving back toward
+// the centre while lifting (letting go of a crouch) is never a flick.
 function flickOnRelease(t) {
   const now = performance.now();
   const recent = t.hist.filter((p) => now - p.t < 60);
@@ -545,11 +546,12 @@ function flickOnRelease(t) {
   const max = fullTilt(t.stick);
   const dt = Math.max(last.t - first.t, 8) / 1000;
   const vx = (last.x - first.x) / max / dt, vy = (last.y - first.y) / max / dt;
-  const speed = Math.hypot(vx, vy); // full tilts per second
-  if (speed < 5) return;
-  let x = (t.x - t.ox) / max, y = (t.y - t.oy) / max;
-  let len = Math.hypot(x, y);
-  if (len < 0.3) { x = vx; y = vy; len = speed; } // lifted near the centre: use the motion
+  const x = (t.x - t.ox) / max, y = (t.y - t.oy) / max;
+  const len = Math.hypot(x, y);
+  // Lifted near the centre, or just overshooting it while letting go: a release.
+  if (len < 0.6) return;
+  const outward = (vx * x + vy * y) / len; // speed away from the centre, tilts per second
+  if (outward < 4) return;
   const i = t.stick.dataset.stick === 'ls' ? 0 : 2;
   padState.a[i] = +(x / len).toFixed(3);
   padState.a[i + 1] = +(y / len).toFixed(3);
@@ -567,11 +569,13 @@ function onTouch(e) {
       const zoneBusy = zone && [...touches.values()].some((s) => s.stick === zone);
       // A fixed stick measures from the middle of its zone, like a real
       // joystick: landing low already counts as pulled back.
+      // Landing near the middle is neutral, though, so resting your thumb on
+      // the stick never reads as a small push in some direction.
       let ox = t.clientX, oy = t.clientY;
       if (zone && isFixed(zone)) {
         const zr = zone.getBoundingClientRect();
-        ox = zr.left + zr.width / 2;
-        oy = zr.top + zr.height / 2;
+        const cx = zr.left + zr.width / 2, cy = zr.top + zr.height / 2;
+        if (Math.hypot(t.clientX - cx, t.clientY - cy) > fullTilt(zone) * 0.5) { ox = cx; oy = cy; }
       }
       touches.set(t.identifier, {
         dpad: !!(el && el.closest('#dpad')),
