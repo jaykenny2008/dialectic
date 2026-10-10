@@ -1,0 +1,15 @@
+{
+  "name": "iphone-controller",
+  "version": "1.0.0",
+  "description": "Use your iPhone as a game controller for browser games on your Mac",
+  "main": "server.js",
+  "private": true,
+  "scripts": {
+    "start": "node server.js",
+    "dry": "node server.js --dry"
+  },
+  "dependencies": {
+    "qrcode-terminal": "0.12.0",
+    "ws": "8.18.0"
+  }
+}

@@ -1,0 +1,450 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Controller">
+<meta name="theme-color" content="#0e0f13">
+<title>Phone Controller</title>
+<style>
+  :root {
+    --bg: #0e0f13;
+    --plate: #1a1c23;
+    --plate-edge: #262933;
+    --btn: #2b2f3a;
+    --btn-on: #3d4352;
+    --text: #e8eaf0;
+    --muted: #8a90a0;
+    --a: #3ecf8e; --b: #ef5b5b; --x: #4c9bff; --y: #f5c542;
+    --accent: #7c8cff;
+    --size: min(46vh, 46vw, 240px);
+    --face: min(17vh, 84px);
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font: 500 14px/1.3 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+    overflow: hidden; overscroll-behavior: none;
+    -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+  }
+
+  #pad {
+    position: fixed; inset: 0; touch-action: none;
+    padding: max(14px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+             max(14px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+    display: flex; flex-direction: column;
+  }
+
+  /* ---- top bar ---- */
+  .top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+  .bottom { flex: 1; display: flex; align-items: center; justify-content: space-between; }
+  .shoulder {
+    height: 44px; flex: 0 1 170px; min-width: 60px; border-radius: 12px 12px 18px 18px;
+    background: var(--btn); border: 1px solid var(--plate-edge);
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    font-weight: 700; font-size: 16px;
+  }
+  #center-top { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .pills { display: flex; gap: 10px; align-items: center; }
+  .pill {
+    height: 30px; padding: 0 12px; white-space: nowrap; border-radius: 15px;
+    background: var(--btn); border: 1px solid var(--plate-edge);
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted);
+  }
+  #gear {
+    width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--plate-edge);
+    background: var(--plate); color: var(--muted); display: grid; place-items: center;
+  }
+  #status { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--muted); }
+  #dot { width: 8px; height: 8px; border-radius: 50%; background: #e0a030; }
+  #dot.ok { background: var(--a); }
+  #dot.bad { background: var(--b); }
+
+  /* ---- d-pad ---- */
+  .left, .right { display: flex; align-items: center; }
+  .left { justify-content: flex-start; padding-left: 2vw; }
+  .right { justify-content: flex-end; padding-right: 2vw; }
+  #dpad, #face { flex-shrink: 0; }
+  #dpad {
+    width: var(--size); height: var(--size); border-radius: 50%;
+    background: var(--plate); border: 1px solid var(--plate-edge);
+    display: grid; grid-template: 1fr 1fr 1fr / 1fr 1fr 1fr; padding: 9%;
+    box-shadow: inset 0 2px 10px rgba(0,0,0,.4);
+  }
+  #dpad .arm { background: var(--btn); display: grid; place-items: center; color: var(--muted); font-size: 18px; }
+  #dpad .arm.on, .on { background: var(--btn-on) !important; }
+  #dpad .arm.on { color: var(--text); }
+  #dpad [data-dir="up"]    { grid-area: 1 / 2; border-radius: 10px 10px 0 0; }
+  #dpad [data-dir="left"]  { grid-area: 2 / 1; border-radius: 10px 0 0 10px; }
+  #dpad .hub               { grid-area: 2 / 2; background: var(--btn); }
+  #dpad [data-dir="right"] { grid-area: 2 / 3; border-radius: 0 10px 10px 0; }
+  #dpad [data-dir="down"]  { grid-area: 3 / 2; border-radius: 0 0 10px 10px; }
+
+  /* ---- face buttons ---- */
+  #face {
+    width: var(--size); height: var(--size); position: relative;
+  }
+  .fb {
+    position: absolute; width: var(--face); height: var(--face); border-radius: 50%;
+    color: var(--c); background: var(--btn); border: 2px solid var(--c);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font-size: 24px; font-weight: 800; transition: transform 40ms;
+  }
+  .fb.on { transform: scale(.93); background: var(--c) !important; color: var(--bg); }
+  .fb[data-btn="y"] { --c: var(--y); top: 0; left: 50%; translate: -50% 0; }
+  .fb[data-btn="x"] { --c: var(--x); left: 0; top: 50%; translate: 0 -50%; }
+  .fb[data-btn="b"] { --c: var(--b); right: 0; top: 50%; translate: 0 -50%; }
+  .fb[data-btn="a"] { --c: var(--a); bottom: 0; left: 50%; translate: -50% 0; }
+  .key { font-size: 10px; font-weight: 600; color: var(--muted); letter-spacing: .02em; margin-top: 1px; }
+  .fb .key { color: inherit; opacity: .75; }
+  body.nolabels .key { display: none; }
+
+  /* ---- overlays ---- */
+  #rotate, #settings {
+    position: fixed; inset: 0; display: none; background: rgba(10,11,14,.97); z-index: 10;
+  }
+  #rotate { align-items: center; justify-content: center; flex-direction: column; gap: 12px; text-align: center; padding: 24px; }
+  #rotate .big { font-size: 48px; }
+  @media (orientation: portrait) { #rotate { display: flex; } }
+
+  #settings.open { display: block; }
+  #settings .inner {
+    height: 100%; overflow-y: auto; -webkit-overflow-scrolling: touch;
+    padding: max(18px, env(safe-area-inset-top)) max(22px, env(safe-area-inset-right))
+             max(18px, env(safe-area-inset-bottom)) max(22px, env(safe-area-inset-left));
+    user-select: auto;
+  }
+  #settings h2 { margin: 0 0 4px; font-size: 20px; }
+  #settings h3 { margin: 22px 0 10px; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+  #settings .hint { color: var(--muted); font-size: 13px; margin: 0; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px 14px; }
+  .grid label { display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    background: var(--plate); border: 1px solid var(--plate-edge); border-radius: 10px; padding: 8px 10px; white-space: nowrap; }
+  .grid select { width: 110px; }
+  select, button.chip {
+    font: inherit; color: var(--text); background: var(--btn); border: 1px solid var(--plate-edge);
+    border-radius: 8px; padding: 7px 10px;
+  }
+  button.chip.sel { border-color: var(--accent); background: #2a2f4a; }
+  .toggle { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
+  .toggle input { width: 20px; height: 20px; accent-color: var(--accent); }
+  #done { position: sticky; top: 0; float: right; background: var(--accent); color: #fff; border: 0; font-weight: 700; padding: 9px 18px; border-radius: 10px; font: inherit; font-weight: 700; }
+</style>
+</head>
+<body>
+
+<div id="pad">
+  <div class="top">
+    <div class="shoulder l" data-btn="l">L <span class="key"></span></div>
+    <div id="center-top">
+      <div class="pills">
+        <div class="pill" data-btn="select">Select <span class="key"></span></div>
+        <button id="gear" aria-label="Settings">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+        <div class="pill" data-btn="start">Start <span class="key"></span></div>
+      </div>
+      <div id="status"><span id="dot"></span><span id="status-text">Connecting…</span></div>
+    </div>
+    <div class="shoulder r" data-btn="r">R <span class="key"></span></div>
+  </div>
+
+  <div class="bottom">
+    <div class="left">
+      <div id="dpad">
+        <div class="arm" data-dir="up">▲</div>
+        <div class="arm" data-dir="left">◀</div>
+        <div class="hub"></div>
+        <div class="arm" data-dir="right">▶</div>
+        <div class="arm" data-dir="down">▼</div>
+      </div>
+    </div>
+    <div class="right">
+      <div id="face">
+        <div class="fb" data-btn="y">Y<span class="key"></span></div>
+        <div class="fb" data-btn="x">X<span class="key"></span></div>
+        <div class="fb" data-btn="b">B<span class="key"></span></div>
+        <div class="fb" data-btn="a">A<span class="key"></span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="rotate">
+  <div class="big">↻</div>
+  <div>Turn your phone sideways to use the controller.</div>
+  <div class="hint" style="color:var(--muted)">If it won't rotate, turn off Portrait Orientation Lock in Control Center.</div>
+</div>
+
+<div id="settings">
+  <div class="inner">
+    <button id="done">Done</button>
+    <h2>Controller settings</h2>
+    <p class="hint">Pick which Mac key each button presses. Saved on this phone.</p>
+
+    <h3>Presets</h3>
+    <div class="row" id="presets"></div>
+
+    <h3>Buttons</h3>
+    <div class="grid" id="mapping"></div>
+
+    <h3>Options</h3>
+    <label class="toggle"><input type="checkbox" id="opt-4way"> 4-way D-pad (no diagonals)</label>
+    <label class="toggle"><input type="checkbox" id="opt-labels"> Show key names on buttons</label>
+
+    <h3>Tip</h3>
+    <p class="hint">For full screen, tap Share → <b>Add to Home Screen</b> in Safari, then open the controller from your Home Screen.</p>
+  </div>
+</div>
+
+<script>
+// ---------------------------------------------------------------------------
+// Key mapping
+// ---------------------------------------------------------------------------
+
+const KEY_NAMES = [
+  'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
+  'Space', 'Enter', 'Escape', 'Tab', 'Backspace', 'Shift', 'Control', 'Option',
+  ...'abcdefghijklmnopqrstuvwxyz'.split(''),
+  ...'0123456789'.split(''),
+  'Comma', 'Period', 'Slash', 'Semicolon', 'Minus', 'Equal',
+];
+const PRETTY = {
+  ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→',
+  Escape: 'Esc', Backspace: '⌫', Control: 'Ctrl', Comma: ',', Period: '.',
+  Slash: '/', Semicolon: ';', Minus: '-', Equal: '=',
+};
+const pretty = (k) => !k ? '—' : PRETTY[k] || (k.length === 1 ? k.toUpperCase() : k);
+
+const BUTTONS = {
+  up: 'D-pad ↑', down: 'D-pad ↓', left: 'D-pad ←', right: 'D-pad →',
+  a: 'A', b: 'B', x: 'X', y: 'Y', l: 'L', r: 'R', start: 'Start', select: 'Select',
+};
+const ARROWS = { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' };
+const PRESETS = {
+  arrows: { label: 'Arrows + Space', map: { ...ARROWS, a: 'Space', b: 'x', x: 'z', y: 'c', l: 'Shift', r: 'v', start: 'Enter', select: 'Escape' } },
+  wasd:   { label: 'WASD + Space', map: { up: 'w', left: 'a', down: 's', right: 'd', a: 'Space', b: 'e', x: 'q', y: 'r', l: 'Shift', r: 'f', start: 'Enter', select: 'Escape' } },
+  retro:  { label: 'Retro (Z / X)', map: { ...ARROWS, a: 'x', b: 'z', x: 's', y: 'a', l: 'q', r: 'w', start: 'Enter', select: 'Shift' } },
+};
+
+function loadSettings() {
+  try {
+    const s = JSON.parse(localStorage.getItem('controller-settings'));
+    if (s && s.map) return s;
+  } catch {}
+  return { preset: 'arrows', map: { ...PRESETS.arrows.map }, fourWay: false, labels: true };
+}
+function saveSettings() {
+  try { localStorage.setItem('controller-settings', JSON.stringify(settings)); } catch {}
+}
+let settings = loadSettings();
+
+function renderLabels() {
+  document.querySelectorAll('[data-btn]').forEach((el) => {
+    const k = el.querySelector('.key');
+    if (k) k.textContent = pretty(settings.map[el.dataset.btn]);
+  });
+  document.body.classList.toggle('nolabels', !settings.labels);
+}
+
+// ---------------------------------------------------------------------------
+// Connection to the Mac
+// ---------------------------------------------------------------------------
+
+const token = new URLSearchParams(location.search).get('k') || '';
+const dot = document.getElementById('dot');
+const statusText = document.getElementById('status-text');
+let ws = null;
+let retryMs = 500;
+let pressedKeys = new Set();
+
+function setStatus(text, cls) {
+  statusText.textContent = text;
+  dot.className = cls || '';
+}
+
+function connect() {
+  ws = new WebSocket(`ws://${location.host}/?k=${encodeURIComponent(token)}`);
+  ws.onopen = () => {
+    retryMs = 500;
+    setStatus('Connected', 'ok');
+    pressedKeys = new Set();
+    update(); // re-press anything still held through a reconnect
+  };
+  ws.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    if (msg.t === 'pong') setStatus(`Connected · ${Math.round(performance.now() - msg.id)} ms`, 'ok');
+  };
+  ws.onclose = (e) => {
+    pressedKeys = new Set(); // the Mac releases everything when we drop
+    if (e.code === 4001) {
+      setStatus('Old link: rescan the QR code on your Mac', 'bad');
+      return;
+    }
+    setStatus('Reconnecting…', 'bad');
+    setTimeout(connect, retryMs);
+    retryMs = Math.min(retryMs * 2, 4000);
+  };
+}
+
+function send(msg) {
+  if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
+}
+
+setInterval(() => send({ t: 'ping', id: performance.now() }), 2000);
+
+// ---------------------------------------------------------------------------
+// Touch handling
+// ---------------------------------------------------------------------------
+//
+// Every active finger is tracked. A finger that lands on the D-pad steers it
+// by its angle from the centre (so you can roll between directions). Any
+// other finger presses whichever button is under it right now (so you can
+// slide from A to B). After each touch event the set of keys that should be
+// held is recomputed and only the differences are sent to the Mac.
+
+const pad = document.getElementById('pad');
+const dpad = document.getElementById('dpad');
+const touches = new Map();
+
+function dpadDirections(x, y) {
+  const r = dpad.getBoundingClientRect();
+  const dx = x - (r.left + r.width / 2);
+  const dy = y - (r.top + r.height / 2);
+  if (Math.hypot(dx, dy) < r.width * 0.12) return []; // dead zone in the middle
+  const sectors = settings.fourWay ? 4 : 8;
+  const step = (2 * Math.PI) / sectors;
+  const i = ((Math.round(Math.atan2(dy, dx) / step) % sectors) + sectors) % sectors;
+  const dirs8 = [['right'], ['right', 'down'], ['down'], ['down', 'left'], ['left'], ['left', 'up'], ['up'], ['up', 'right']];
+  return settings.fourWay ? [['right'], ['down'], ['left'], ['up']][i] : dirs8[i];
+}
+
+function update() {
+  const active = new Set();
+  for (const t of touches.values()) {
+    if (t.dpad) {
+      dpadDirections(t.x, t.y).forEach((d) => active.add(d));
+    } else {
+      const el = document.elementFromPoint(t.x, t.y);
+      const btn = el && el.closest('[data-btn]');
+      if (btn) active.add(btn.dataset.btn);
+    }
+  }
+
+  document.querySelectorAll('[data-btn]').forEach((el) => el.classList.toggle('on', active.has(el.dataset.btn)));
+  document.querySelectorAll('[data-dir]').forEach((el) => el.classList.toggle('on', active.has(el.dataset.dir)));
+
+  const keys = new Set([...active].map((b) => settings.map[b]).filter(Boolean));
+  for (const k of pressedKeys) if (!keys.has(k)) send({ t: 'u', k });
+  for (const k of keys) if (!pressedKeys.has(k)) send({ t: 'd', k });
+  pressedKeys = keys;
+}
+
+function onTouch(e) {
+  e.preventDefault();
+  for (const t of e.changedTouches) {
+    if (e.type === 'touchstart') {
+      if (!wakeLockAsked) { wakeLockAsked = true; requestWakeLock(); }
+      const el = document.elementFromPoint(t.clientX, t.clientY);
+      if (el && el.closest('#gear')) { openSettings(); return; }
+      touches.set(t.identifier, { dpad: !!(el && el.closest('#dpad')), x: t.clientX, y: t.clientY });
+    } else if (e.type === 'touchmove') {
+      const s = touches.get(t.identifier);
+      if (s) { s.x = t.clientX; s.y = t.clientY; }
+    } else {
+      touches.delete(t.identifier);
+    }
+  }
+  update();
+}
+
+function releaseAll() {
+  touches.clear();
+  update();
+  send({ t: 'reset' });
+}
+
+for (const type of ['touchstart', 'touchmove', 'touchend', 'touchcancel']) {
+  pad.addEventListener(type, onTouch, { passive: false });
+}
+document.addEventListener('gesturestart', (e) => e.preventDefault());
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) releaseAll();
+  else requestWakeLock();
+});
+// Mouse fallback so the page can be tried from a desktop browser.
+document.getElementById('gear').addEventListener('click', openSettings);
+
+// ---------------------------------------------------------------------------
+// Keep the screen awake while playing
+// ---------------------------------------------------------------------------
+
+let wakeLockAsked = false;
+async function requestWakeLock() {
+  try { await navigator.wakeLock?.request('screen'); } catch {}
+}
+
+// ---------------------------------------------------------------------------
+// Settings panel
+// ---------------------------------------------------------------------------
+
+const settingsEl = document.getElementById('settings');
+
+function openSettings() {
+  releaseAll();
+  renderSettings();
+  settingsEl.classList.add('open');
+}
+document.getElementById('done').addEventListener('click', () => settingsEl.classList.remove('open'));
+
+function renderSettings() {
+  const presets = document.getElementById('presets');
+  presets.innerHTML = '';
+  for (const [id, p] of Object.entries(PRESETS)) {
+    const b = document.createElement('button');
+    b.className = 'chip' + (settings.preset === id ? ' sel' : '');
+    b.textContent = p.label;
+    b.onclick = () => {
+      settings.preset = id;
+      settings.map = { ...p.map };
+      saveSettings(); renderLabels(); renderSettings();
+    };
+    presets.appendChild(b);
+  }
+
+  const mapping = document.getElementById('mapping');
+  mapping.innerHTML = '';
+  for (const [btn, label] of Object.entries(BUTTONS)) {
+    const row = document.createElement('label');
+    const sel = document.createElement('select');
+    sel.innerHTML = '<option value="">(none)</option>' +
+      KEY_NAMES.map((k) => `<option value="${k}">${k.length === 1 ? k.toUpperCase() : k}</option>`).join('');
+    sel.value = settings.map[btn] || '';
+    sel.onchange = () => {
+      settings.map[btn] = sel.value;
+      settings.preset = 'custom';
+      saveSettings(); renderLabels(); renderSettings();
+    };
+    row.append(label, sel);
+    mapping.appendChild(row);
+  }
+
+  const fourWay = document.getElementById('opt-4way');
+  fourWay.checked = settings.fourWay;
+  fourWay.onchange = () => { settings.fourWay = fourWay.checked; saveSettings(); };
+  const labels = document.getElementById('opt-labels');
+  labels.checked = settings.labels;
+  labels.onchange = () => { settings.labels = labels.checked; saveSettings(); renderLabels(); };
+}
+
+renderLabels();
+requestWakeLock();
+connect();
+</script>
+</body>
+</html>
