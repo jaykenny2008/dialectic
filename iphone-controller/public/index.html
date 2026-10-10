@@ -269,7 +269,8 @@ function setStatus(text, cls) {
 }
 
 function connect() {
-  ws = new WebSocket(`ws://${location.host}/?k=${encodeURIComponent(token)}`);
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  ws = new WebSocket(`${proto}://${location.host}/?k=${encodeURIComponent(token)}`);
   ws.onopen = () => {
     retryMs = 500;
     setStatus('Connected', 'ok');

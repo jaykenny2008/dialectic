@@ -6,7 +6,8 @@
   "private": true,
   "scripts": {
     "start": "node server.js",
-    "dry": "node server.js --dry"
+    "dry": "node server.js --dry",
+    "online": "node server.js --online"
   },
   "dependencies": {
     "qrcode-terminal": "0.12.0",

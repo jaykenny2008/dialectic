@@ -33,6 +33,20 @@ Every button on the phone presses a real keyboard key on the Mac, so it works wi
 
 Tip: in Safari tap **Share → Add to Home Screen**. The controller then opens full screen with no Safari bars, and the link keeps working every time you start the server.
 
+## No Wi-Fi? Online mode
+
+Some iPhone hotspots don't let the phone reach the Mac directly. You can tell when Terminal shows a link starting with `http://192.0.0.` and Safari says the iPhone is "not connected to the internet". In that case run:
+
+```
+npm run online
+```
+
+This opens a free tunnel through [localhost.run](https://localhost.run) using `ssh`, which is built into macOS, so there's nothing to install. Scan the new `https://` QR code and play. Things to know:
+
+- It adds a little lag, and button presses use a small amount of cellular data.
+- You get a new link each time, so Home Screen shortcuts won't carry over between runs.
+- The link works from anywhere on the internet, but only with the secret code at the end. Don't share it, and press Ctrl+C when you're done playing.
+
 ## Controls
 
 | Button | Default key (Arrows preset) |

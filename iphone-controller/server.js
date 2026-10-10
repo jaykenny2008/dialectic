@@ -6,6 +6,9 @@
 //
 //   node server.js           normal mode (macOS, needs Accessibility permission)
 //   node server.js --dry     log key presses instead of sending them (any OS)
+//   node server.js --online  reach the Mac over the internet through a free
+//                            localhost.run tunnel (for hotspots that block
+//                            phone-to-Mac connections)
 //   PORT=9000 node server.js use a different port
 
 const http = require('http');
@@ -19,6 +22,7 @@ const qrcode = require('qrcode-terminal');
 
 const PORT = Number(process.env.PORT) || 8080;
 const DRY = process.argv.includes('--dry') || process.platform !== 'darwin';
+const ONLINE = process.argv.includes('--online');
 // Only phones that scanned the QR code / opened the printed URL can press keys.
 // The token is kept in a file so a Home Screen shortcut keeps working across
 // restarts; delete .token to revoke old links.
@@ -179,22 +183,82 @@ function lanAddresses() {
   return candidates.length ? candidates.map((c) => c.address) : ['localhost'];
 }
 
-server.listen(PORT, '0.0.0.0', () => {
-  const [best, ...others] = lanAddresses().map((ip) => `http://${ip}:${PORT}/?k=${TOKEN}`);
+function printLink(url, hint) {
   console.log('\n🎮 iPhone controller is running.\n');
-  console.log('Scan this with your iPhone camera (same Wi-Fi or hotspot as this Mac):\n');
-  qrcode.generate(best, { small: true });
-  console.log(`\nOr open: ${best}\n`);
+  console.log(`Scan this with your iPhone camera (${hint}):\n`);
+  qrcode.generate(url, { small: true });
+  console.log(`\nOr open: ${url}\n`);
+}
+
+function printFooter() {
+  if (DRY) console.log('(dry run: key presses are printed here, not sent to the Mac)\n');
+  console.log('Then click into your browser game on the Mac so it has keyboard focus.\n');
+}
+
+// Online mode: ssh (built into macOS) opens a tunnel to localhost.run, which
+// gives a public https:// address that forwards to this server. The secret
+// token in the link still decides who can press keys.
+let tunnel = null;
+
+function startTunnel() {
+  console.log('\n🌐 Opening online tunnel (localhost.run)...');
+  tunnel = spawn('ssh', [
+    '-T',
+    '-o', 'StrictHostKeyChecking=accept-new',
+    '-o', 'ServerAliveInterval=30',
+    '-o', 'ExitOnForwardFailure=yes',
+    '-R', `80:localhost:${PORT}`,
+    'nokey@localhost.run',
+  ], { stdio: ['pipe', 'pipe', 'pipe'] }); // stdin stays open so the session stays up
+
+  let output = '';
+  let found = false;
+  const onData = (buf) => {
+    output += buf.toString();
+    const m = !found && output.match(/https:\/\/[a-z0-9-]+\.lhr\.(?:life|pro)/i);
+    if (m) {
+      found = true;
+      printLink(`${m[0]}/?k=${TOKEN}`, 'works on any network, even cellular');
+      console.log('This link changes every time you run `npm run online`.\n');
+      printFooter();
+    }
+  };
+  tunnel.stdout.on('data', onData);
+  tunnel.stderr.on('data', onData);
+
+  setTimeout(() => {
+    if (found) return;
+    console.log('\nCould not find the tunnel link yet. Here is what localhost.run said:\n');
+    console.log(output || '(nothing yet)');
+    console.log(`\nIf you see an https://... link above, open it on your phone with ?k=${TOKEN} added to the end.\n`);
+  }, 20000);
+
+  tunnel.on('exit', (code) => {
+    console.error(`\nThe online tunnel closed (code ${code}). Run \`npm run online\` again to get a new link.`);
+    if (!found && output) console.error(output);
+    process.exit(1);
+  });
+}
+
+// In online mode only the tunnel needs to reach the server, so stay off the network.
+server.listen(PORT, ONLINE ? '127.0.0.1' : '0.0.0.0', () => {
+  if (ONLINE) return startTunnel();
+  const [best, ...others] = lanAddresses().map((ip) => `http://${ip}:${PORT}/?k=${TOKEN}`);
+  printLink(best, 'same Wi-Fi or hotspot as this Mac');
   if (others.length) {
     console.log("If that page won't open, try these in Safari instead:");
     others.forEach((u) => console.log(`  ${u}`));
     console.log('');
   }
-  if (DRY) console.log('(dry run: key presses are printed here, not sent to the Mac)\n');
-  console.log('Then click into your browser game on the Mac so it has keyboard focus.\n');
+  if (best.includes('//192.0.0.')) {
+    console.log("⚠️  This Mac is on a hotspot that doesn't allow phone-to-Mac connections.");
+    console.log('   Press Ctrl+C and run `npm run online` instead.\n');
+  }
+  printFooter();
 });
 
 process.on('SIGINT', () => {
+  if (tunnel) { tunnel.removeAllListeners('exit'); tunnel.kill(); }
   for (const [key, n] of holders) if (n > 0) sendKey(key, false);
   if (!helper) process.exit(0);
   helper.removeAllListeners('exit');
