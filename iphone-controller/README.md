@@ -49,19 +49,22 @@ This opens a free tunnel through [localhost.run](https://localhost.run) using `s
 
 ## Controls
 
-| Button | Default key (Arrows preset) |
+The default layout is **dual joysticks**, laid out like an Xbox controller:
+
+| Control | Mac key |
 |---|---|
-| D-pad | Arrow keys (diagonals supported, slide your thumb around) |
-| A | Space |
-| B | X |
-| X | Z |
-| Y | C |
-| L / R | Shift / V |
-| Start / Select | Enter / Esc |
+| Left stick | W A S D |
+| Right stick | Arrow keys (flick it for tricks: pull back, then flick) |
+| A / B / X / Y | Space / E / Q / R |
+| LB / RB | Z / X |
+| LT / RT | Shift / C |
+| Start / Back | Esc / Tab |
 
-Tap the ⚙️ on the phone to switch presets (**Arrows + Space**, **WASD + Space**, **Retro Z/X**), remap any button to any key, or make the D-pad 4-way. Settings are saved on the phone.
+Each stick re-centres wherever your thumb lands, so you don't have to hit the exact middle. Let go and the stick snaps back, releasing its keys.
 
-You can hold several buttons at once and slide between buttons (e.g. roll from A to B). If the phone locks or drops off Wi-Fi, the Mac lets go of every key within a few seconds, so nothing stays stuck down.
+Tap the ⚙️ on the phone to switch to a classic **D-pad** layout (Arrows + Space, WASD + Space, or Retro Z/X), remap any button or stick direction to any key, or turn off diagonals. Settings are saved on the phone.
+
+You can hold several buttons at once and slide between buttons (e.g. roll from A to B). If the phone locks or drops off the network, the Mac lets go of every key within a few seconds, so nothing stays stuck down.
 
 ## Troubleshooting
 

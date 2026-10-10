@@ -22,6 +22,7 @@
     --accent: #7c8cff;
     --size: min(46vh, 46vw, 240px);
     --face: min(17vh, 84px);
+    --stick: min(44vh, 34vw, 210px);
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body {
@@ -41,8 +42,10 @@
   /* ---- top bar ---- */
   .top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
   .bottom { flex: 1; display: flex; align-items: center; justify-content: space-between; }
+  .shoulders { display: flex; gap: 8px; flex: 0 1 170px; min-width: 0; }
+  body.sticks .shoulders { flex-basis: 260px; }
   .shoulder {
-    height: 44px; flex: 0 1 170px; min-width: 60px; border-radius: 12px 12px 18px 18px;
+    height: 44px; flex: 1 1 0; min-width: 0; border-radius: 12px 12px 18px 18px;
     background: var(--btn); border: 1px solid var(--plate-edge);
     display: flex; align-items: center; justify-content: center; gap: 8px;
     font-weight: 700; font-size: 16px;
@@ -63,6 +66,30 @@
   #dot { width: 8px; height: 8px; border-radius: 50%; background: #e0a030; }
   #dot.ok { background: var(--a); }
   #dot.bad { background: var(--b); }
+
+  /* ---- layouts ---- */
+  body.sticks .classic-only, body:not(.sticks) .sticks-only { display: none !important; }
+
+  /* ---- joysticks ---- */
+  /* The stick re-centres wherever your thumb lands inside its zone. */
+  .stick-zone { position: relative; flex: 1 1 0; align-self: stretch; min-width: 0; }
+  .stick-base {
+    position: absolute; left: 50%; top: 50%; width: var(--stick); height: var(--stick);
+    translate: -50% -50%; border-radius: 50%;
+    background: var(--plate); border: 1px solid var(--plate-edge);
+    box-shadow: inset 0 2px 10px rgba(0,0,0,.4); pointer-events: none;
+  }
+  .stick-knob {
+    position: absolute; left: 50%; top: 50%; width: 44%; height: 44%; translate: -50% -50%;
+    border-radius: 50%; background: var(--btn-on); border: 1px solid #4a5163;
+    box-shadow: 0 4px 14px rgba(0,0,0,.5);
+  }
+  .stick-zone.active .stick-knob { background: #58617a; }
+  .stick-label {
+    position: absolute; left: 0; right: 0; bottom: 2px; text-align: center;
+    font-size: 11px; font-weight: 600; color: var(--muted); letter-spacing: .04em; pointer-events: none;
+  }
+  body.nolabels .stick-label { display: none; }
 
   /* ---- d-pad ---- */
   .left, .right { display: flex; align-items: center; }
@@ -88,6 +115,9 @@
   #face {
     width: var(--size); height: var(--size); position: relative;
   }
+  body.sticks #face { --size: min(42vh, 27vw, 190px); --face: min(15vh, 70px); }
+  body.sticks .fb { font-size: 21px; }
+  body.sticks .fb .key { font-size: 9px; letter-spacing: 0; }
   .fb {
     position: absolute; width: var(--face); height: var(--face); border-radius: 50%;
     color: var(--c); background: var(--btn); border: 2px solid var(--c);
@@ -140,10 +170,14 @@
 
 <div id="pad">
   <div class="top">
-    <div class="shoulder l" data-btn="l">L <span class="key"></span></div>
+    <div class="shoulders">
+      <div class="shoulder sticks-only" data-btn="lt">LT <span class="key"></span></div>
+      <div class="shoulder sticks-only" data-btn="lb">LB <span class="key"></span></div>
+      <div class="shoulder classic-only" data-btn="l">L <span class="key"></span></div>
+    </div>
     <div id="center-top">
       <div class="pills">
-        <div class="pill" data-btn="select">Select <span class="key"></span></div>
+        <div class="pill" data-btn="select"><span id="select-name">Select</span> <span class="key"></span></div>
         <button id="gear" aria-label="Settings">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         </button>
@@ -151,11 +185,23 @@
       </div>
       <div id="status"><span id="dot"></span><span id="status-text">Connecting…</span></div>
     </div>
-    <div class="shoulder r" data-btn="r">R <span class="key"></span></div>
+    <div class="shoulders">
+      <div class="shoulder sticks-only" data-btn="rb">RB <span class="key"></span></div>
+      <div class="shoulder sticks-only" data-btn="rt">RT <span class="key"></span></div>
+      <div class="shoulder classic-only" data-btn="r">R <span class="key"></span></div>
+    </div>
   </div>
 
   <div class="bottom">
-    <div class="left">
+    <div class="stick-zone sticks-only" data-stick="ls">
+      <div class="stick-base"><div class="stick-knob"></div></div>
+      <div class="stick-label"></div>
+    </div>
+    <div class="stick-zone sticks-only" data-stick="rs">
+      <div class="stick-base"><div class="stick-knob"></div></div>
+      <div class="stick-label"></div>
+    </div>
+    <div class="left classic-only">
       <div id="dpad">
         <div class="arm" data-dir="up">▲</div>
         <div class="arm" data-dir="left">◀</div>
@@ -194,7 +240,7 @@
     <div class="grid" id="mapping"></div>
 
     <h3>Options</h3>
-    <label class="toggle"><input type="checkbox" id="opt-4way"> 4-way D-pad (no diagonals)</label>
+    <label class="toggle"><input type="checkbox" id="opt-4way"> 4-way D-pad and sticks (no diagonals)</label>
     <label class="toggle"><input type="checkbox" id="opt-labels"> Show key names on buttons</label>
 
     <h3>Tip</h3>
@@ -221,35 +267,57 @@ const PRETTY = {
 };
 const pretty = (k) => !k ? '—' : PRETTY[k] || (k.length === 1 ? k.toUpperCase() : k);
 
+// Buttons shown (and remappable) in each layout.
 const BUTTONS = {
-  up: 'D-pad ↑', down: 'D-pad ↓', left: 'D-pad ←', right: 'D-pad →',
-  a: 'A', b: 'B', x: 'X', y: 'Y', l: 'L', r: 'R', start: 'Start', select: 'Select',
+  classic: {
+    up: 'D-pad ↑', down: 'D-pad ↓', left: 'D-pad ←', right: 'D-pad →',
+    a: 'A', b: 'B', x: 'X', y: 'Y', l: 'L', r: 'R', start: 'Start', select: 'Select',
+  },
+  sticks: {
+    ls_up: 'Left stick ↑', ls_down: 'Left stick ↓', ls_left: 'Left stick ←', ls_right: 'Left stick →',
+    rs_up: 'Right stick ↑', rs_down: 'Right stick ↓', rs_left: 'Right stick ←', rs_right: 'Right stick →',
+    a: 'A', b: 'B', x: 'X', y: 'Y', lb: 'LB', rb: 'RB', lt: 'LT', rt: 'RT', start: 'Start', select: 'Back',
+  },
 };
 const ARROWS = { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' };
 const PRESETS = {
-  arrows: { label: 'Arrows + Space', map: { ...ARROWS, a: 'Space', b: 'x', x: 'z', y: 'c', l: 'Shift', r: 'v', start: 'Enter', select: 'Escape' } },
-  wasd:   { label: 'WASD + Space', map: { up: 'w', left: 'a', down: 's', right: 'd', a: 'Space', b: 'e', x: 'q', y: 'r', l: 'Shift', r: 'f', start: 'Enter', select: 'Escape' } },
-  retro:  { label: 'Retro (Z / X)', map: { ...ARROWS, a: 'x', b: 'z', x: 's', y: 'a', l: 'q', r: 'w', start: 'Enter', select: 'Shift' } },
+  sticks: { label: 'Dual sticks (WASD + Arrows)', layout: 'sticks', map: {
+    ls_up: 'w', ls_left: 'a', ls_down: 's', ls_right: 'd',
+    rs_up: 'ArrowUp', rs_left: 'ArrowLeft', rs_down: 'ArrowDown', rs_right: 'ArrowRight',
+    a: 'Space', b: 'e', x: 'q', y: 'r', lb: 'z', rb: 'x', lt: 'Shift', rt: 'c', start: 'Escape', select: 'Tab',
+  } },
+  arrows: { label: 'D-pad: Arrows + Space', layout: 'classic', map: { ...ARROWS, a: 'Space', b: 'x', x: 'z', y: 'c', l: 'Shift', r: 'v', start: 'Enter', select: 'Escape' } },
+  wasd:   { label: 'D-pad: WASD + Space', layout: 'classic', map: { up: 'w', left: 'a', down: 's', right: 'd', a: 'Space', b: 'e', x: 'q', y: 'r', l: 'Shift', r: 'f', start: 'Enter', select: 'Escape' } },
+  retro:  { label: 'D-pad: Retro (Z / X)', layout: 'classic', map: { ...ARROWS, a: 'x', b: 'z', x: 's', y: 'a', l: 'q', r: 'w', start: 'Enter', select: 'Shift' } },
 };
 
+const SETTINGS_KEY = 'controller-settings-v2';
 function loadSettings() {
   try {
-    const s = JSON.parse(localStorage.getItem('controller-settings'));
-    if (s && s.map) return s;
+    const s = JSON.parse(localStorage.getItem(SETTINGS_KEY));
+    if (s && s.map && BUTTONS[s.layout]) return s;
   } catch {}
-  return { preset: 'arrows', map: { ...PRESETS.arrows.map }, fourWay: false, labels: true };
+  return { preset: 'sticks', layout: 'sticks', map: { ...PRESETS.sticks.map }, fourWay: false, labels: true };
 }
 function saveSettings() {
-  try { localStorage.setItem('controller-settings', JSON.stringify(settings)); } catch {}
+  try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch {}
 }
 let settings = loadSettings();
 
 function renderLabels() {
+  document.body.classList.toggle('sticks', settings.layout === 'sticks');
+  document.body.classList.toggle('nolabels', !settings.labels);
+  document.getElementById('select-name').textContent = BUTTONS[settings.layout].select;
   document.querySelectorAll('[data-btn]').forEach((el) => {
     const k = el.querySelector('.key');
     if (k) k.textContent = pretty(settings.map[el.dataset.btn]);
   });
-  document.body.classList.toggle('nolabels', !settings.labels);
+  document.querySelectorAll('[data-stick]').forEach((zone) => {
+    const p = zone.dataset.stick;
+    const keys = ['up', 'left', 'down', 'right'].map((d) => pretty(settings.map[`${p}_${d}`]));
+    zone.querySelector('.stick-label').textContent =
+      `${p === 'ls' ? 'Left' : 'Right'} stick · ${keys.join(' ')}`;
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -304,20 +372,20 @@ setInterval(() => send({ t: 'ping', id: performance.now() }), 2000);
 // ---------------------------------------------------------------------------
 //
 // Every active finger is tracked. A finger that lands on the D-pad steers it
-// by its angle from the centre (so you can roll between directions). Any
-// other finger presses whichever button is under it right now (so you can
-// slide from A to B). After each touch event the set of keys that should be
-// held is recomputed and only the differences are sent to the Mac.
+// by its angle from the centre (so you can roll between directions). A finger
+// that lands in a joystick zone becomes that stick's centre, and the stick
+// points wherever the finger moves from there. Any other finger presses
+// whichever button is under it right now (so you can slide from A to B).
+// After each touch event the set of keys that should be held is recomputed
+// and only the differences are sent to the Mac.
 
 const pad = document.getElementById('pad');
 const dpad = document.getElementById('dpad');
 const touches = new Map();
 
-function dpadDirections(x, y) {
-  const r = dpad.getBoundingClientRect();
-  const dx = x - (r.left + r.width / 2);
-  const dy = y - (r.top + r.height / 2);
-  if (Math.hypot(dx, dy) < r.width * 0.12) return []; // dead zone in the middle
+// Directions for an offset (dx, dy) from a centre; nothing inside the dead zone.
+function directions(dx, dy, deadZone) {
+  if (Math.hypot(dx, dy) < deadZone) return [];
   const sectors = settings.fourWay ? 4 : 8;
   const step = (2 * Math.PI) / sectors;
   const i = ((Math.round(Math.atan2(dy, dx) / step) % sectors) + sectors) % sectors;
@@ -325,10 +393,41 @@ function dpadDirections(x, y) {
   return settings.fourWay ? [['right'], ['down'], ['left'], ['up']][i] : dirs8[i];
 }
 
+function dpadDirections(x, y) {
+  const r = dpad.getBoundingClientRect();
+  return directions(x - (r.left + r.width / 2), y - (r.top + r.height / 2), r.width * 0.12);
+}
+
+const stickRadius = (zone) => zone.querySelector('.stick-base').offsetWidth / 2;
+
+function renderStick(zone, t) {
+  const base = zone.querySelector('.stick-base');
+  const knob = zone.querySelector('.stick-knob');
+  zone.classList.toggle('active', !!t);
+  if (!t) {
+    base.style.left = base.style.top = knob.style.transform = '';
+    return;
+  }
+  const zr = zone.getBoundingClientRect();
+  base.style.left = `${t.ox - zr.left}px`;
+  base.style.top = `${t.oy - zr.top}px`;
+  const max = stickRadius(zone) * 0.62;
+  let dx = t.x - t.ox, dy = t.y - t.oy;
+  const len = Math.hypot(dx, dy);
+  if (len > max) { dx *= max / len; dy *= max / len; }
+  knob.style.transform = `translate(${dx}px, ${dy}px)`;
+}
+
 function update() {
   const active = new Set();
+  const stickTouches = new Map();
   for (const t of touches.values()) {
-    if (t.dpad) {
+    if (t.stick) {
+      stickTouches.set(t.stick, t);
+      const p = t.stick.dataset.stick;
+      directions(t.x - t.ox, t.y - t.oy, stickRadius(t.stick) * 0.22)
+        .forEach((d) => active.add(`${p}_${d}`));
+    } else if (t.dpad) {
       dpadDirections(t.x, t.y).forEach((d) => active.add(d));
     } else {
       const el = document.elementFromPoint(t.x, t.y);
@@ -339,6 +438,7 @@ function update() {
 
   document.querySelectorAll('[data-btn]').forEach((el) => el.classList.toggle('on', active.has(el.dataset.btn)));
   document.querySelectorAll('[data-dir]').forEach((el) => el.classList.toggle('on', active.has(el.dataset.dir)));
+  document.querySelectorAll('[data-stick]').forEach((zone) => renderStick(zone, stickTouches.get(zone)));
 
   const keys = new Set([...active].map((b) => settings.map[b]).filter(Boolean));
   for (const k of pressedKeys) if (!keys.has(k)) send({ t: 'u', k });
@@ -353,7 +453,13 @@ function onTouch(e) {
       if (!wakeLockAsked) { wakeLockAsked = true; requestWakeLock(); }
       const el = document.elementFromPoint(t.clientX, t.clientY);
       if (el && el.closest('#gear')) { openSettings(); return; }
-      touches.set(t.identifier, { dpad: !!(el && el.closest('#dpad')), x: t.clientX, y: t.clientY });
+      const zone = el && el.closest('[data-stick]');
+      const zoneBusy = zone && [...touches.values()].some((s) => s.stick === zone);
+      touches.set(t.identifier, {
+        dpad: !!(el && el.closest('#dpad')),
+        stick: zone && !zoneBusy ? zone : null,
+        ox: t.clientX, oy: t.clientY, x: t.clientX, y: t.clientY,
+      });
     } else if (e.type === 'touchmove') {
       const s = touches.get(t.identifier);
       if (s) { s.x = t.clientX; s.y = t.clientY; }
@@ -412,6 +518,7 @@ function renderSettings() {
     b.textContent = p.label;
     b.onclick = () => {
       settings.preset = id;
+      settings.layout = p.layout;
       settings.map = { ...p.map };
       saveSettings(); renderLabels(); renderSettings();
     };
@@ -420,7 +527,7 @@ function renderSettings() {
 
   const mapping = document.getElementById('mapping');
   mapping.innerHTML = '';
-  for (const [btn, label] of Object.entries(BUTTONS)) {
+  for (const [btn, label] of Object.entries(BUTTONS[settings.layout])) {
     const row = document.createElement('label');
     const sel = document.createElement('select');
     sel.innerHTML = '<option value="">(none)</option>' +
