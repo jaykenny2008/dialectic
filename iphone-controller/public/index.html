@@ -248,6 +248,8 @@
     <h3>Options</h3>
     <label class="toggle"><input type="checkbox" id="opt-4way"> 4-way D-pad and sticks (no diagonals)</label>
     <label class="toggle"><input type="checkbox" id="opt-labels"> Show key names on buttons</label>
+    <p class="hint" style="margin-top:10px">Stick sensitivity: how far you move your thumb for full tilt</p>
+    <div class="row" id="sensitivity" style="margin-top:8px"></div>
 
     <h3>Tip</h3>
     <p class="hint">For full screen, tap Share → <b>Add to Home Screen</b> in Safari, then open the controller from your Home Screen.</p>
@@ -407,6 +409,9 @@ function dpadDirections(x, y) {
 }
 
 const stickRadius = (zone) => zone.querySelector('.stick-base').offsetWidth / 2;
+// How far (as a fraction of the stick's radius) the thumb moves for full tilt.
+const SENSITIVITY = { relaxed: 0.62, normal: 0.5, quick: 0.38 };
+const fullTilt = (zone) => stickRadius(zone) * (SENSITIVITY[settings.sensitivity] || SENSITIVITY.quick);
 
 function renderStick(zone, t) {
   const base = zone.querySelector('.stick-base');
@@ -419,7 +424,7 @@ function renderStick(zone, t) {
   const zr = zone.getBoundingClientRect();
   base.style.left = `${t.ox - zr.left}px`;
   base.style.top = `${t.oy - zr.top}px`;
-  const max = stickRadius(zone) * 0.62;
+  const max = fullTilt(zone);
   let dx = t.x - t.ox, dy = t.y - t.oy;
   const len = Math.hypot(dx, dy);
   if (len > max) { dx *= max / len; dy *= max / len; }
@@ -433,7 +438,7 @@ function update() {
     if (t.stick) {
       stickTouches.set(t.stick, t);
       const p = t.stick.dataset.stick;
-      directions(t.x - t.ox, t.y - t.oy, stickRadius(t.stick) * 0.22)
+      directions(t.x - t.ox, t.y - t.oy, fullTilt(t.stick) * 0.35)
         .forEach((d) => active.add(`${p}_${d}`));
     } else if (t.dpad) {
       dpadDirections(t.x, t.y).forEach((d) => active.add(d));
@@ -473,12 +478,11 @@ const GAMEPAD_BUTTONS = {
   select: 8, start: 9, up: 12, down: 13, left: 14, right: 15,
 };
 let lastPad = '';
-let padFrame = 0;
 let padState = { a: [0, 0, 0, 0], b: 0 };
 
 function stickAxes(zone, t) {
   if (!t) return [0, 0];
-  const max = stickRadius(zone) * 0.62; // full tilt where the knob stops
+  const max = fullTilt(zone); // full tilt where the knob stops
   let x = (t.x - t.ox) / max, y = (t.y - t.oy) / max;
   const len = Math.hypot(x, y);
   const dead = 0.08;
@@ -494,16 +498,38 @@ function sendPad(active, stickTouches) {
   let b = 0;
   for (const id of active) if (id in GAMEPAD_BUTTONS) b |= 1 << GAMEPAD_BUTTONS[id];
   padState = { a: [...stickAxes(ls, stickTouches.get(ls)), ...stickAxes(rs, stickTouches.get(rs))], b };
-  // Touch events can fire faster than the screen refreshes; send once per frame.
-  if (!padFrame) padFrame = requestAnimationFrame(flushPad);
+  // Send every change straight away: batching would drop the tail of a fast
+  // flick when the thumb moves and lifts within the same frame.
+  flushPad();
 }
 
 function flushPad() {
-  padFrame = 0;
   const msg = JSON.stringify(padState);
   if (msg === lastPad) return;
   lastPad = msg;
   send({ t: 'pad', ...padState });
+}
+
+// A thumb that is still moving fast when it lifts is a flick: send the stick
+// at full tilt in that direction. The extension holds it for a few frames
+// before re-centring, so the game sees the whole flick.
+function flickOnRelease(t) {
+  const now = performance.now();
+  const recent = t.hist.filter((p) => now - p.t < 60);
+  if (recent.length < 2) return;
+  const first = recent[0], last = recent[recent.length - 1];
+  const max = fullTilt(t.stick);
+  const dt = Math.max(last.t - first.t, 8) / 1000;
+  const vx = (last.x - first.x) / max / dt, vy = (last.y - first.y) / max / dt;
+  const speed = Math.hypot(vx, vy); // full tilts per second
+  if (speed < 5) return;
+  let x = (t.x - t.ox) / max, y = (t.y - t.oy) / max;
+  let len = Math.hypot(x, y);
+  if (len < 0.3) { x = vx; y = vy; len = speed; } // lifted near the centre: use the motion
+  const i = t.stick.dataset.stick === 'ls' ? 0 : 2;
+  padState.a[i] = +(x / len).toFixed(3);
+  padState.a[i + 1] = +(y / len).toFixed(3);
+  flushPad();
 }
 
 function onTouch(e) {
@@ -519,11 +545,18 @@ function onTouch(e) {
         dpad: !!(el && el.closest('#dpad')),
         stick: zone && !zoneBusy ? zone : null,
         ox: t.clientX, oy: t.clientY, x: t.clientX, y: t.clientY,
+        hist: [{ t: performance.now(), x: t.clientX, y: t.clientY }],
       });
     } else if (e.type === 'touchmove') {
       const s = touches.get(t.identifier);
-      if (s) { s.x = t.clientX; s.y = t.clientY; }
+      if (s) {
+        s.x = t.clientX; s.y = t.clientY;
+        s.hist.push({ t: performance.now(), x: s.x, y: s.y });
+        if (s.hist.length > 8) s.hist.shift();
+      }
     } else {
+      const s = touches.get(t.identifier);
+      if (s && s.stick && settings.gamepad && e.type === 'touchend') flickOnRelease(s);
       touches.delete(t.identifier);
     }
   }
@@ -610,6 +643,15 @@ function renderSettings() {
   const fourWay = document.getElementById('opt-4way');
   fourWay.checked = settings.fourWay;
   fourWay.onchange = () => { settings.fourWay = fourWay.checked; saveSettings(); };
+  const sens = document.getElementById('sensitivity');
+  sens.innerHTML = '';
+  for (const [id, label] of [['relaxed', 'Relaxed'], ['normal', 'Normal'], ['quick', 'Quick']]) {
+    const b = document.createElement('button');
+    b.className = 'chip' + ((settings.sensitivity || 'quick') === id ? ' sel' : '');
+    b.textContent = label;
+    b.onclick = () => { settings.sensitivity = id; saveSettings(); renderSettings(); };
+    sens.appendChild(b);
+  }
   const labels = document.getElementById('opt-labels');
   labels.checked = settings.labels;
   labels.onchange = () => { settings.labels = labels.checked; saveSettings(); renderLabels(); };
