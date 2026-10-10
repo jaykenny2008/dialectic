@@ -501,7 +501,27 @@ function sendPad(active, stickTouches) {
   const rs = document.querySelector('[data-stick="rs"]');
   let b = 0;
   for (const id of active) if (id in GAMEPAD_BUTTONS) b |= 1 << GAMEPAD_BUTTONS[id];
-  padState = { a: [...stickAxes(ls, stickTouches.get(ls)), ...stickAxes(rs, stickTouches.get(rs))], b };
+  const next = { a: [...stickAxes(ls, stickTouches.get(ls)), ...stickAxes(rs, stickTouches.get(rs))], b };
+  // A fast circular sweep can jump past a whole direction between two touch
+  // samples (iPhones report touches 60 times a second). A real stick would
+  // sweep through it, so send the in-between direction first.
+  const between = padState.a.slice();
+  let swept = false;
+  for (const i of [0, 2]) {
+    const [px, py] = padState.a.slice(i, i + 2), [nx, ny] = next.a.slice(i, i + 2);
+    if (Math.hypot(px, py) < 0.6 || Math.hypot(nx, ny) < 0.6) continue;
+    const pa = Math.atan2(py, px);
+    const turn = Math.atan2(Math.sin(Math.atan2(ny, nx) - pa), Math.cos(Math.atan2(ny, nx) - pa));
+    // Only gaps of about one direction (50-110 degrees): bigger jumps are a
+    // straight flick (e.g. back to up-left), which must not gain a detour.
+    if (Math.abs(turn) < Math.PI * 0.28 || Math.abs(turn) > Math.PI * 0.6) continue;
+    const mid = pa + turn / 2;
+    between[i] = +Math.cos(mid).toFixed(3);
+    between[i + 1] = +Math.sin(mid).toFixed(3);
+    swept = true;
+  }
+  if (swept) { padState = { a: between, b }; flushPad(); }
+  padState = next;
   // Send every change straight away: batching would drop the tail of a fast
   // flick when the thumb moves and lifts within the same frame.
   flushPad();

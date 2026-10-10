@@ -59,20 +59,25 @@
   // A fast flick (pull back, push forward, let go) can reach us as a burst of
   // updates within one game frame, especially over a tunnel. If we applied
   // them straight away the game would only ever see the last one. Instead,
-  // every change of direction is shown for at least DWELL_MS, in order;
-  // updates within the same direction pass through immediately.
-  const DWELL_MS = 40;
-  const sticks = [0, 1].map(() => ({ sector: 'c', since: 0, queue: [], timer: null }));
+  // every change of direction is shown, in order, for at least a frame or two,
+  // at the strongest tilt reached in that direction; then the stick settles on
+  // where the thumb really is. Updates within a settled direction pass through.
+  const DWELL_MS = 34;     // ~2 frames at 60 fps
+  const CATCH_UP_MS = 20;  // ~1 frame, while working through a backlog
+  const MAX_QUEUE = 8;
+  const entry = (sector, p) => ({ sector, peak: p, latest: p });
+  const sticks = [0, 1].map(() => ({ cur: entry('c', [0, 0]), since: 0, dwell: 0, queue: [], timer: null }));
+  const mag = (p) => Math.hypot(p[0], p[1]);
 
   function sectorOf(x, y) {
     if (Math.hypot(x, y) < 0.35) return 'c';
     return String(((Math.round(Math.atan2(y, x) / (Math.PI / 4)) % 8) + 8) % 8);
   }
 
-  function applyStick(k, x, y) {
+  function show(k, p) {
     const a = pad.axes.slice();
-    a[2 * k] = x;
-    a[2 * k + 1] = y;
+    a[2 * k] = p[0];
+    a[2 * k + 1] = p[1];
     pad.axes = a;
     pad.timestamp = performance.now();
   }
@@ -81,37 +86,44 @@
     const st = sticks[k];
     clearTimeout(st.timer);
     st.timer = null;
-    while (st.queue.length) {
-      const wait = st.since + DWELL_MS - performance.now();
-      if (wait > 0) {
-        st.timer = setTimeout(() => pump(k), wait);
-        return;
-      }
-      const [x, y, sector] = st.queue.shift();
-      applyStick(k, x, y);
-      st.sector = sector;
+    const wait = st.since + st.dwell - performance.now();
+    if (wait > 0) {
+      st.timer = setTimeout(() => pump(k), wait);
+      return;
+    }
+    if (st.queue.length) {
+      st.cur = st.queue.shift();
       st.since = performance.now();
+      st.dwell = st.queue.length ? CATCH_UP_MS : DWELL_MS;
+      show(k, st.cur.peak);
+      st.timer = setTimeout(() => pump(k), st.dwell);
+    } else {
+      show(k, st.cur.latest); // done showing the peak: settle on the real position
     }
   }
 
   function receiveStick(k, x, y) {
     const st = sticks[k];
+    const p = [x, y];
     const sector = sectorOf(x, y);
-    const last = st.queue.length ? st.queue[st.queue.length - 1][2] : st.sector;
-    if (sector === last) {
-      if (st.queue.length) st.queue[st.queue.length - 1] = [x, y, sector];
-      else applyStick(k, x, y);
+    const tail = st.queue.length ? st.queue[st.queue.length - 1] : st.cur;
+    if (sector === tail.sector) {
+      tail.latest = p;
+      if (sector === 'c' || mag(p) >= mag(tail.peak)) tail.peak = p;
+      // The current direction: show stronger tilts at once; weaker ones wait
+      // until its moment is over (the pending pump settles on them).
+      if (tail === st.cur && (tail.peak === p || performance.now() - st.since >= st.dwell)) show(k, p);
       return;
     }
-    st.queue.push([x, y, sector]);
-    if (st.queue.length > 4) st.queue.splice(0, st.queue.length - 4); // never fall far behind
+    st.queue.push(entry(sector, p));
+    if (st.queue.length > MAX_QUEUE) st.queue.splice(0, st.queue.length - MAX_QUEUE);
     pump(k);
   }
 
   function resetSticks() {
     for (const st of sticks) {
       clearTimeout(st.timer);
-      Object.assign(st, { sector: 'c', since: 0, queue: [], timer: null });
+      Object.assign(st, { cur: entry('c', [0, 0]), since: 0, dwell: 0, queue: [], timer: null });
     }
     pad.axes = [0, 0, 0, 0];
   }
