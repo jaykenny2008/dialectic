@@ -13,7 +13,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const crypto = require('crypto');
-const { spawn, spawnSync } = require('child_process');
+const { spawn } = require('child_process');
 const { WebSocketServer } = require('ws');
 const qrcode = require('qrcode-terminal');
 
@@ -49,20 +49,11 @@ const KEYCODES = {
 function startKeyHelper() {
   if (DRY) return null;
 
-  const src = path.join(__dirname, 'keys.swift');
-  const bin = path.join(__dirname, '.keys-helper');
-  const stale = !fs.existsSync(bin) || fs.statSync(bin).mtimeMs < fs.statSync(src).mtimeMs;
-  if (stale) {
-    console.log('Compiling key helper (first run only)...');
-    const res = spawnSync('swiftc', ['-O', src, '-o', bin], { stdio: 'inherit' });
-    if (res.error || res.status !== 0) {
-      console.error('\nCould not compile keys.swift. Install the Xcode command line tools with:');
-      console.error('  xcode-select --install\nthen run this again.');
-      process.exit(1);
-    }
-  }
-
-  const helper = spawn(bin, [], { stdio: ['pipe', 'pipe', 'inherit'] });
+  // keys.js runs on the JavaScript for Automation engine built into macOS,
+  // so nothing has to be installed or compiled.
+  const helper = spawn('osascript', ['-l', 'JavaScript', path.join(__dirname, 'keys.js')], {
+    stdio: ['pipe', 'pipe', 'inherit'],
+  });
   helper.stdout.on('data', (buf) => {
     if (buf.toString().includes('NO_ACCESSIBILITY')) {
       console.log('\n⚠️  Key presses are blocked until you allow this terminal app in');

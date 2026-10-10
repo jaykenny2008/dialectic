@@ -11,12 +11,7 @@ Every button on the phone presses a real keyboard key on the Mac, so it works wi
 ## One-time setup (Mac)
 
 1. **Install Node.js** from https://nodejs.org (or `brew install node`).
-2. **Install Apple's command line tools**, which are needed to build the tiny key-press helper:
-   ```
-   xcode-select --install
-   ```
-   (If it says they're already installed, you're good.)
-3. In Terminal, go to this folder and install:
+2. In Terminal, go to this folder and install:
    ```
    cd iphone-controller
    npm install
@@ -66,4 +61,4 @@ You can hold several buttons at once and slide between buttons (e.g. roll from A
 
 - `server.js`: serves the page and turns phone input into key presses
 - `public/index.html`: the controller page your iPhone opens
-- `keys.swift`: tiny macOS helper that sends the key events (built automatically on first run)
+- `keys.js`: tiny helper that sends the key events using automation tools built into macOS (nothing to install)
