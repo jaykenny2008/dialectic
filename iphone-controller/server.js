@@ -166,24 +166,30 @@ setInterval(() => {
 // Startup
 // ---------------------------------------------------------------------------
 
-function lanAddress() {
+function lanAddresses() {
   const candidates = [];
   for (const [name, addrs] of Object.entries(os.networkInterfaces())) {
     for (const a of addrs || []) {
       if (a.family === 'IPv4' && !a.internal) candidates.push({ name, address: a.address });
     }
   }
-  // Prefer the Mac's Wi-Fi (en0) over VPNs, bridges, etc.
-  candidates.sort((a, b) => (a.name === 'en0' ? -1 : b.name === 'en0' ? 1 : 0));
-  return candidates[0] ? candidates[0].address : 'localhost';
+  // Prefer an iPhone hotspot address (172.20.10.x), then the Mac's Wi-Fi (en0).
+  const rank = (c) => (c.address.startsWith('172.20.10.') ? 0 : c.name === 'en0' ? 1 : 2);
+  candidates.sort((a, b) => rank(a) - rank(b));
+  return candidates.length ? candidates.map((c) => c.address) : ['localhost'];
 }
 
 server.listen(PORT, '0.0.0.0', () => {
-  const url = `http://${lanAddress()}:${PORT}/?k=${TOKEN}`;
+  const [best, ...others] = lanAddresses().map((ip) => `http://${ip}:${PORT}/?k=${TOKEN}`);
   console.log('\n🎮 iPhone controller is running.\n');
-  console.log('Scan this with your iPhone camera (same Wi-Fi as this Mac):\n');
-  qrcode.generate(url, { small: true });
-  console.log(`\nOr open: ${url}\n`);
+  console.log('Scan this with your iPhone camera (same Wi-Fi or hotspot as this Mac):\n');
+  qrcode.generate(best, { small: true });
+  console.log(`\nOr open: ${best}\n`);
+  if (others.length) {
+    console.log("If that page won't open, try these in Safari instead:");
+    others.forEach((u) => console.log(`  ${u}`));
+    console.log('');
+  }
   if (DRY) console.log('(dry run: key presses are printed here, not sent to the Mac)\n');
   console.log('Then click into your browser game on the Mac so it has keyboard focus.\n');
 });
