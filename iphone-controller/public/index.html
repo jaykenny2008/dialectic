@@ -246,6 +246,7 @@
     </div>
 
     <h3>Options</h3>
+    <label class="toggle"><input type="checkbox" id="opt-rfixed"> Right stick has a fixed centre (best for flick tricks)</label>
     <label class="toggle"><input type="checkbox" id="opt-4way"> 4-way D-pad and sticks (no diagonals)</label>
     <label class="toggle"><input type="checkbox" id="opt-labels"> Show key names on buttons</label>
     <p class="hint" style="margin-top:10px">Stick sensitivity: how far you move your thumb for full tilt</p>
@@ -408,6 +409,9 @@ function dpadDirections(x, y) {
   return directions(x - (r.left + r.width / 2), y - (r.top + r.height / 2), r.width * 0.12);
 }
 
+// The right stick defaults to a fixed centre (best for flick tricks); the left
+// one floats to wherever the thumb lands.
+const isFixed = (zone) => zone.dataset.stick === 'rs' && settings.rightFixed !== false;
 const stickRadius = (zone) => zone.querySelector('.stick-base').offsetWidth / 2;
 // How far (as a fraction of the stick's radius) the thumb moves for full tilt.
 const SENSITIVITY = { relaxed: 0.62, normal: 0.5, quick: 0.38 };
@@ -541,10 +545,18 @@ function onTouch(e) {
       if (el && el.closest('#gear')) { openSettings(); return; }
       const zone = el && el.closest('[data-stick]');
       const zoneBusy = zone && [...touches.values()].some((s) => s.stick === zone);
+      // A fixed stick measures from the middle of its zone, like a real
+      // joystick: landing low already counts as pulled back.
+      let ox = t.clientX, oy = t.clientY;
+      if (zone && isFixed(zone)) {
+        const zr = zone.getBoundingClientRect();
+        ox = zr.left + zr.width / 2;
+        oy = zr.top + zr.height / 2;
+      }
       touches.set(t.identifier, {
         dpad: !!(el && el.closest('#dpad')),
         stick: zone && !zoneBusy ? zone : null,
-        ox: t.clientX, oy: t.clientY, x: t.clientX, y: t.clientY,
+        ox, oy, x: t.clientX, y: t.clientY,
         hist: [{ t: performance.now(), x: t.clientX, y: t.clientY }],
       });
     } else if (e.type === 'touchmove') {
@@ -640,6 +652,9 @@ function renderSettings() {
     mapping.appendChild(row);
   }
 
+  const rFixed = document.getElementById('opt-rfixed');
+  rFixed.checked = settings.rightFixed !== false;
+  rFixed.onchange = () => { settings.rightFixed = rFixed.checked; saveSettings(); };
   const fourWay = document.getElementById('opt-4way');
   fourWay.checked = settings.fourWay;
   fourWay.onchange = () => { settings.fourWay = fourWay.checked; saveSettings(); };
